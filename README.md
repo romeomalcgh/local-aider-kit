@@ -34,7 +34,7 @@ The frontend is served on loopback at port 3000. Local chat history and saved me
 
 Cloud sync is off by default and must be enabled per conversation. Project files and model weights are never uploaded by the sync feature.
 
-The D1 database `local-aider-sync` has been created in the Cloudflare account and migration `0001_initial.sql` applied remotely. Before enabling cloud sync, finish configuring Cloudflare Access (team domain and application audience) and a protected Worker URL. Details are in [browser-ui/README.md](browser-ui/README.md).
+The D1 database `local-aider-sync` has been created in the Cloudflare account and migration `0001_initial.sql` applied remotely. Cloud sync uses a private Worker bearer token and does not require Zero Trust. Setup instructions are in [browser-ui/README.md](browser-ui/README.md).
 
 ## Requirements
 

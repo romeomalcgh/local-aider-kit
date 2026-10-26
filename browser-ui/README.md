@@ -34,16 +34,16 @@ The Worker and D1 schema are under `cloud/worker`. Local conversations remain lo
 2. Create the D1 database: `npx wrangler d1 create local-aider-sync`.
 3. Copy the returned database ID into `cloud/worker/wrangler.toml`.
 4. Apply the migration: `npx wrangler d1 migrations apply local-aider-sync --remote --config cloud/worker/wrangler.toml`.
-5. Configure a custom domain for the Worker and protect it with a Cloudflare Access application. Configure the team domain and application audience in `wrangler.toml`.
+5. Set a strong random token as a Worker secret: `npx wrangler secret put SYNC_ACCESS_TOKEN --config cloud/worker/wrangler.toml`. Use at least 32 random characters; never commit the token.
 6. Deploy: `npm run cloud:deploy`.
-7. Put the Access-protected Worker URL in the local app Settings, then use **Sign in through Cloudflare Access**.
+7. In local app Settings, enter the Worker URL and the same token, save, then click **Verify sync token**.
 
-Do not deploy until the D1 ID, Access team domain and Access audience have been configured. Use a custom domain for the Access-protected app rather than exposing private chat data on an unprotected workers.dev endpoint.
+The Worker uses bearer-token authentication and does not require Zero Trust. Anyone with the token can access the synced account, so keep it private and rotate it with `npx wrangler secret put SYNC_ACCESS_TOKEN --config cloud/worker/wrangler.toml` if it is exposed. A `workers.dev` hostname is sufficient; a custom domain is optional.
 
 ## Privacy and limitations
 
 - Local inference only; no hosted model API is used.
 - Local chat/memory JSON is not committed.
-- Cloud sync is opt-in per conversation and requires Cloudflare Access.
+- Cloud sync is opt-in per conversation and requires the private Worker bearer token.
 - The local server is loopback-bound. It is not a remote-access service.
 - Review changes in Git before accepting them. Aider operates with the Windows permissions of the account running it.

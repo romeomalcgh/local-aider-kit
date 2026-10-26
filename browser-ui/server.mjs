@@ -18,7 +18,7 @@ const fallbackWorkspace = path.join(os.homedir(), 'Documents', 'AiderWorkspace')
 const DEFAULT_WORKSPACE = process.env.AIDER_WORKSPACE || (existsSync(preferredWorkspace) ? preferredWorkspace : fallbackWorkspace);
 mkdirSync(DATA_DIR, { recursive: true });
 mkdirSync(DEFAULT_WORKSPACE, { recursive: true });
-if (!existsSync(STORE_FILE)) writeFileSync(STORE_FILE, JSON.stringify({ conversations: [], memories: [], settings: { workspace: DEFAULT_WORKSPACE, cloudSyncEnabled: false, cloudUrl: '', cloudLoginEmail: '' } }, null, 2));
+if (!existsSync(STORE_FILE)) writeFileSync(STORE_FILE, JSON.stringify({ conversations: [], memories: [], settings: { workspace: DEFAULT_WORKSPACE, cloudSyncEnabled: false, cloudUrl: '', cloudLoginEmail: '', cloudSyncToken: '' } }, null, 2));
 let store = JSON.parse(readFileSync(STORE_FILE, 'utf8'));
 const persist = () => writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
 if (!process.env.AIDER_WORKSPACE && path.resolve(store.settings.workspace || '') === path.resolve(__dirname, '..')) { store.settings.workspace = DEFAULT_WORKSPACE; persist(); }
@@ -119,6 +119,7 @@ app.patch('/api/settings', (req, res) => {
   if (typeof body.cloudUrl === 'string') store.settings.cloudUrl = body.cloudUrl.trim().replace(/\/$/, '');
   if (typeof body.cloudSyncEnabled === 'boolean') store.settings.cloudSyncEnabled = body.cloudSyncEnabled;
   if (typeof body.cloudLoginEmail === 'string') store.settings.cloudLoginEmail = body.cloudLoginEmail.trim().slice(0, 200);
+  if (typeof body.cloudSyncToken === 'string') store.settings.cloudSyncToken = body.cloudSyncToken.trim().slice(0, 500);
   persist(); res.json({ ...store.settings, model: MODEL, ollamaBase: OLLAMA_BASE });
 });
 app.post('/api/chat/:id', asyncRoute(async (req, res) => {
