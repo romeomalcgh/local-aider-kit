@@ -1,0 +1,14 @@
+name = "local-aider-sync"
+main = "src/index.ts"
+compatibility_date = "2026-10-26"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "local-aider-sync"
+database_id = "fca68109-68bf-4c3e-9d86-97ceeb44ebdf"
+migrations_dir = "migrations"
+
+[vars]
+CF_ACCESS_TEAM_DOMAIN = "https://REPLACE_WITH_TEAM.cloudflareaccess.com"
+CF_ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD"

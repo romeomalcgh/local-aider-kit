@@ -5,3 +5,4 @@
 models/
 dist/
 __pycache__/
+.aider*

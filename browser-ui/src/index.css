@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+:root {
+  font-family: 'DM Sans', Inter, 'Segoe UI', sans-serif;
+  color: #e9ebf2;
+  background: #0a0b0e;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  --bg: #0a0b0e;
+  --panel: #101217;
+  --panel-raised: #151820;
+  --panel-hover: #1a1e28;
+  --border: #262a34;
+  --border-soft: #1c2028;
+  --text: #e9ebf2;
+  --muted: #8b91a0;
+  --faint: #5d6473;
+  --blue: #4e8dff;
+  --blue-bright: #70a6ff;
+  --blue-dim: rgba(78,141,255,.12);
+  --green: #61d7a0;
+  --sans: 'DM Sans', Inter, 'Segoe UI', sans-serif;
+  --mono: 'DM Mono', Consolas, monospace;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, textarea { font: inherit; }
+button { cursor: pointer; }
+button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+::selection { background: rgba(78,141,255,.28); }
+::-webkit-scrollbar { width: 7px; height: 7px; }
+::-webkit-scrollbar-thumb { background: #303542; border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }

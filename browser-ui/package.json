@@ -1,0 +1,40 @@
+{
+  "name": "local-aider-browser-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -k \"npm:server:dev\" \"npm:ui:dev\"",
+    "server:dev": "node --watch server.mjs",
+    "ui:dev": "vite --host 127.0.0.1 --port 3000",
+    "build": "tsc -b && vite build",
+    "start": "node server.mjs",
+    "preview": "vite preview --host 127.0.0.1 --port 3000",
+    "cloud:dev": "wrangler dev cloud/worker/src/index.ts --config cloud/worker/wrangler.toml",
+    "cloud:deploy": "wrangler deploy --config cloud/worker/wrangler.toml",
+    "cloud:whoami": "wrangler whoami"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "lucide-react": "^1.61.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "react-syntax-highlighter": "^16.1.2",
+    "jose": "^6.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "@vitejs/plugin-react": "^6.1.2",
+    "concurrently": "^10.0.6",
+    "oxlint": "^1.88.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.4",
+    "wrangler": "^4.153.0"
+  }
+}
