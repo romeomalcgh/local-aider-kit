@@ -18,14 +18,14 @@ const fallbackWorkspace = path.join(os.homedir(), 'Documents', 'AiderWorkspace')
 const DEFAULT_WORKSPACE = process.env.AIDER_WORKSPACE || (existsSync(preferredWorkspace) ? preferredWorkspace : fallbackWorkspace);
 mkdirSync(DATA_DIR, { recursive: true });
 mkdirSync(DEFAULT_WORKSPACE, { recursive: true });
-if (!existsSync(STORE_FILE)) writeFileSync(STORE_FILE, JSON.stringify({ conversations: [], memories: [], settings: { workspace: DEFAULT_WORKSPACE, cloudSyncEnabled: false, cloudUrl: '', cloudLoginEmail: '', cloudSyncToken: '' } }, null, 2));
+if (!existsSync(STORE_FILE)) writeFileSync(STORE_FILE, JSON.stringify({ conversations: [], memories: [], settings: { workspace: DEFAULT_WORKSPACE, cloudSyncEnabled: false, cloudUrl: '', cloudLoginEmail: '', cloudSyncToken: '', googleClientId: '', storageProvider: 'local' } }, null, 2));
 let store = JSON.parse(readFileSync(STORE_FILE, 'utf8'));
 if (!Array.isArray(store.workspaces)) store.workspaces = [...new Set([store.settings?.workspace || DEFAULT_WORKSPACE])].map(p => ({ id: randomUUID(), name: path.basename(p) || p, path: p, updatedAt: new Date().toISOString() }));
 const persist = () => writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
 if (!process.env.AIDER_WORKSPACE && path.resolve(store.settings.workspace || '') === path.resolve(__dirname, '..')) { store.settings.workspace = DEFAULT_WORKSPACE; persist(); }
 const now = () => new Date().toISOString();
 app.disable('x-powered-by');
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '10mb' }));
 app.use((req, res, next) => {
   const host = req.headers.host || '';
   if (!['127.0.0.1:3001', 'localhost:3001', '127.0.0.1:3000', 'localhost:3000'].includes(host) && process.env.NODE_ENV !== 'production') return res.status(403).json({ error: 'Loopback host only.' });
@@ -86,6 +86,17 @@ app.delete('/api/workspaces/:id', (req, res) => {
   if (path.resolve(target.path) === workspacePath()) return res.status(400).json({ error: 'Cannot remove the active workspace from the saved list.' });
   store.workspaces = store.workspaces.filter(w => w.id !== req.params.id); persist(); res.status(204).end();
 });
+app.post('/api/backup/restore', (req, res) => {
+  const body = req.body || {};
+  if (!Array.isArray(body.conversations) || !Array.isArray(body.memories) || !Array.isArray(body.workspaces)) return res.status(400).json({ error: 'Backup must contain conversations, memories and workspaces arrays.' });
+  if (body.conversations.length > 5000 || body.memories.length > 5000 || body.workspaces.length > 500) return res.status(413).json({ error: 'Backup exceeds supported item limits.' });
+  const backupFile = STORE_FILE + '.before-google-restore-' + Date.now() + '.json';
+  writeFileSync(backupFile, JSON.stringify(store, null, 2));
+  store.conversations = body.conversations.filter(c => c && typeof c.id === 'string' && Array.isArray(c.messages)).map(c => ({ id:c.id, title:String(c.title || 'Imported chat').slice(0,120), updatedAt:String(c.updatedAt || now()), syncEnabled:false, messages:c.messages.filter(m => m && typeof m.content === 'string').map(m => ({ id:String(m.id || randomUUID()), role:['user','assistant','system'].includes(m.role)?m.role:'assistant', content:m.content.slice(0,50000), createdAt:String(m.createdAt || now()) })) }));
+  store.memories = body.memories.filter(m => m && typeof m.content === 'string').map(m => ({ id:String(m.id || randomUUID()), content:m.content.slice(0,4000), category:String(m.category || 'project').slice(0,40), project:String(m.project || '').slice(0,260), syncEnabled:false, updatedAt:String(m.updatedAt || now()) }));
+  store.workspaces = body.workspaces.filter(w => w && typeof w.path === 'string').map(w => ({ id:String(w.id || randomUUID()), name:String(w.name || path.basename(w.path)).slice(0,80), path:w.path, updatedAt:String(w.updatedAt || now()) }));
+  persist(); res.json({ ok:true, conversations:store.conversations.length, memories:store.memories.length, workspaces:store.workspaces.length, backupFile });
+});
 app.get('/api/conversations', (_req, res) => res.json(store.conversations.map(cleanConversation).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt))));
 app.post('/api/conversations', (req, res) => {
   const id = randomUUID();
@@ -138,6 +149,8 @@ app.patch('/api/settings', (req, res) => {
   if (typeof body.cloudSyncEnabled === 'boolean') store.settings.cloudSyncEnabled = body.cloudSyncEnabled;
   if (typeof body.cloudLoginEmail === 'string') store.settings.cloudLoginEmail = body.cloudLoginEmail.trim().slice(0, 200);
   if (typeof body.cloudSyncToken === 'string') store.settings.cloudSyncToken = body.cloudSyncToken.trim().slice(0, 500);
+  if (typeof body.googleClientId === 'string') store.settings.googleClientId = body.googleClientId.trim().slice(0, 300);
+  if (['local', 'google-drive', 'cloudflare'].includes(body.storageProvider)) store.settings.storageProvider = body.storageProvider;
   persist(); res.json({ ...store.settings, model: MODEL, ollamaBase: OLLAMA_BASE });
 });
 app.post('/api/chat/:id', asyncRoute(async (req, res) => {

@@ -30,7 +30,17 @@ npm start
 
 Then open http://localhost:3000.
 
-## Cloudflare sync (optional)
+## Google login and Google Drive backup (optional)
+
+1. In Google Cloud Console, create/select a project and enable the **Google Drive API**.
+2. Configure the OAuth consent screen. While in testing mode, add your Google account as a test user.
+3. Create an OAuth Client ID of type **Web application**. Add `http://localhost:3000` and `http://127.0.0.1:3000` as authorized JavaScript origins. No client secret is needed in this browser-only token flow; never put a client secret in the app.
+4. In Local Aider Settings, choose **Google Drive (private app data)**, paste the OAuth client ID ending in `.apps.googleusercontent.com`, save settings, and select **Sign in with Google**.
+5. Use **Back up to Drive** or **Restore from Drive**. The backup is stored in Drive's hidden `appDataFolder`, not the visible file list. Restore creates a local pre-restore copy of `data/local-store.json` before replacing conversations, memories and workspace entries. Workspace paths are metadata only; actual project files are not uploaded or restored.
+
+Google access is granted through Google's OAuth popup. The access token is kept in app memory, not saved to the local JSON store, and must be renewed after a page reload or token expiry. This backup is a manual snapshot, not automatic real-time sync. The app stores only conversations, saved memories and workspace path metadata; it does not upload model weights or project source files.
+
+## Cloudflare sync (optional legacy provider)
 
 The Worker and D1 schema are under `cloud/worker`. Local conversations remain local until you explicitly enable sync on a conversation. Source files, project directories and model weights are never uploaded by the sync code.
 
