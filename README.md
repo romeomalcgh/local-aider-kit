@@ -14,7 +14,7 @@ Setup installs or locates Ollama, uv, Node.js LTS, Aider and the local model, th
 
 ## Launch
 
-Run `launch.bat`. It opens the browser UI at http://localhost:3000. Choose your project folder in Settings. The default is `C:\Games\Chair\CS2\Qwen` if that folder exists; otherwise the repository root is selected.
+Run `launch.bat`. It opens the browser UI at http://localhost:3000. Choose your project folder in Settings. The default is `C:\Games\Chair\CS2\Qwen` if that folder exists; otherwise `Documents\AiderWorkspace` is created so the installer repository is not the default writable project.
 
 ## Browser UI
 

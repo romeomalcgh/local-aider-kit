@@ -14,11 +14,14 @@ const OLLAMA_BASE = process.env.OLLAMA_API_BASE || 'http://127.0.0.1:11434';
 const DATA_DIR = path.join(__dirname, 'data');
 const STORE_FILE = path.join(DATA_DIR, 'local-store.json');
 const preferredWorkspace = 'C:\Games\Chair\CS2\Qwen';
-const DEFAULT_WORKSPACE = process.env.AIDER_WORKSPACE || (existsSync(preferredWorkspace) ? preferredWorkspace : path.resolve(__dirname, '..'));
+const fallbackWorkspace = path.join(os.homedir(), 'Documents', 'AiderWorkspace');
+const DEFAULT_WORKSPACE = process.env.AIDER_WORKSPACE || (existsSync(preferredWorkspace) ? preferredWorkspace : fallbackWorkspace);
 mkdirSync(DATA_DIR, { recursive: true });
+mkdirSync(DEFAULT_WORKSPACE, { recursive: true });
 if (!existsSync(STORE_FILE)) writeFileSync(STORE_FILE, JSON.stringify({ conversations: [], memories: [], settings: { workspace: DEFAULT_WORKSPACE, cloudSyncEnabled: false, cloudUrl: '', cloudLoginEmail: '' } }, null, 2));
 let store = JSON.parse(readFileSync(STORE_FILE, 'utf8'));
 const persist = () => writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
+if (!process.env.AIDER_WORKSPACE && path.resolve(store.settings.workspace || '') === path.resolve(__dirname, '..')) { store.settings.workspace = DEFAULT_WORKSPACE; persist(); }
 const now = () => new Date().toISOString();
 app.disable('x-powered-by');
 app.use(express.json({ limit: '1mb' }));
@@ -166,10 +169,6 @@ app.post('/api/chat/:id', asyncRoute(async (req, res) => {
   child.on('error', err => { send({ type: 'error', error: err.message }); finish(1); });
   child.on('close', code => finish(code ?? 1));
   res.on('close', () => { if (!res.writableEnded && !closed) child.kill(); });
-}));
-app.post('/api/sync/now', asyncRoute(async (_req, res) => {
-  if (!store.settings.cloudSyncEnabled || !store.settings.cloudUrl) return res.status(400).json({ error: 'Enable cloud sync and configure the Worker URL in Settings first.' });
-  return res.status(501).json({ error: 'Cloud sync endpoint is scaffolded but requires Cloudflare Access login and a deployed Worker. Local chats remain safely stored on this PC.' });
 }));
 app.use('/api', (_req, res) => res.status(404).json({ error: 'API route not found.' }));
 app.use((err, _req, res, _next) => { console.error(err); if (!res.headersSent) res.status(500).json({ error: err.message || 'Internal server error.' }); else res.end(); });

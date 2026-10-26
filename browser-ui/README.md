@@ -14,7 +14,7 @@ npm run dev
 
 Open http://localhost:3000. The Vite frontend and local API run on loopback only. The API persists conversations and memories in `data/local-store.json`, which is gitignored.
 
-The default workspace uses `C:\Games\Chair\CS2\Qwen` when present; otherwise it uses the repository root. Choose a different existing project folder in Settings if needed. Aider is launched in the selected workspace using the local Ollama model.
+The default workspace uses `C:\Games\Chair\CS2\Qwen` when present; otherwise it creates `Documents\AiderWorkspace` so Aider does not start with the installer repository as its default writable project. Choose a different existing project folder in Settings if needed. Aider is launched in the selected workspace using the local Ollama model.
 
 For a production-like local launch:
 
