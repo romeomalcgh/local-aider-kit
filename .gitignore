@@ -1,0 +1,7 @@
+﻿# Keep local secrets, model weights and build output out of Git.
+.env
+.env.*
+*.gguf
+models/
+dist/
+__pycache__/
