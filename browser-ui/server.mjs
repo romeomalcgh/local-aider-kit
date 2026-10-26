@@ -20,6 +20,7 @@ mkdirSync(DATA_DIR, { recursive: true });
 mkdirSync(DEFAULT_WORKSPACE, { recursive: true });
 if (!existsSync(STORE_FILE)) writeFileSync(STORE_FILE, JSON.stringify({ conversations: [], memories: [], settings: { workspace: DEFAULT_WORKSPACE, cloudSyncEnabled: false, cloudUrl: '', cloudLoginEmail: '', cloudSyncToken: '' } }, null, 2));
 let store = JSON.parse(readFileSync(STORE_FILE, 'utf8'));
+if (!Array.isArray(store.workspaces)) store.workspaces = [...new Set([store.settings?.workspace || DEFAULT_WORKSPACE])].map(p => ({ id: randomUUID(), name: path.basename(p) || p, path: p, updatedAt: new Date().toISOString() }));
 const persist = () => writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
 if (!process.env.AIDER_WORKSPACE && path.resolve(store.settings.workspace || '') === path.resolve(__dirname, '..')) { store.settings.workspace = DEFAULT_WORKSPACE; persist(); }
 const now = () => new Date().toISOString();
@@ -68,6 +69,23 @@ app.get('/api/health', asyncRoute(async (_req, res) => {
   } catch (e) { ollama.error = e.message; }
   res.json({ ok: true, ollama, workspace: store.settings.workspace, cloudSyncEnabled: !!store.settings.cloudSyncEnabled, cloudConfigured: !!store.settings.cloudUrl, platform: os.platform() });
 }));
+app.get('/api/workspaces', (_req, res) => res.json(store.workspaces || []));
+app.post('/api/workspaces', (req, res) => {
+  const rawPath = String(req.body?.path || '').trim();
+  if (!rawPath) return res.status(400).json({ error: 'Choose an existing workspace folder.' });
+  const candidate = path.resolve(rawPath);
+  if (!existsSync(candidate)) return res.status(400).json({ error: 'Choose an existing workspace folder.' });
+  const existing = (store.workspaces || []).find(w => path.resolve(w.path) === candidate);
+  if (existing) return res.json(existing);
+  const entry = { id: randomUUID(), name: String(req.body?.name || path.basename(candidate) || candidate).trim().slice(0, 80), path: candidate, updatedAt: now() };
+  store.workspaces = [...(store.workspaces || []), entry]; persist(); res.status(201).json(entry);
+});
+app.delete('/api/workspaces/:id', (req, res) => {
+  const target = (store.workspaces || []).find(w => w.id === req.params.id);
+  if (!target) return res.status(404).json({ error: 'Workspace not found.' });
+  if (path.resolve(target.path) === workspacePath()) return res.status(400).json({ error: 'Cannot remove the active workspace from the saved list.' });
+  store.workspaces = store.workspaces.filter(w => w.id !== req.params.id); persist(); res.status(204).end();
+});
 app.get('/api/conversations', (_req, res) => res.json(store.conversations.map(cleanConversation).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt))));
 app.post('/api/conversations', (req, res) => {
   const id = randomUUID();

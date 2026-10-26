@@ -14,7 +14,11 @@ npm run dev
 
 Open http://localhost:3000. The Vite frontend and local API run on loopback only. The API persists conversations and memories in `data/local-store.json`, which is gitignored.
 
-The default workspace uses `C:\Games\Chair\CS2\Qwen` when present; otherwise it creates `Documents\AiderWorkspace` so Aider does not start with the installer repository as its default writable project. Choose a different existing project folder in Settings if needed. Aider is launched in the selected workspace using the local Ollama model.
+The default workspace uses `C:\Games\Chair\CS2\Qwen` when present; otherwise it creates `Documents\AiderWorkspace` so Aider does not start with the installer repository as its default writable project. Choose a different existing project folder in Settings if needed. Saved workspace paths are stored separately from conversations and can be switched in Settings; the actual source files remain in their original local folders. Aider is launched in the selected workspace using the local Ollama model.
+
+## App commands
+
+Enter `/help` or `/commands` in the composer to list the app-level commands. `/status` shows local model/workspace status, `/workspace` opens workspace settings, and `/sync` syncs the active conversation when selective cloud sync is enabled. These are Local Aider commands, not the full interactive Aider slash-command set: each message currently launches Aider as a one-shot process, so commands such as interactive `/add` and `/drop` are not exposed as native terminal commands in the UI.
 
 For a production-like local launch:
 

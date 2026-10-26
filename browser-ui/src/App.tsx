@@ -23,6 +23,7 @@ function App() {
   const [status, setStatus] = useState('Connecting to local services…')
   const [ollamaOk, setOllamaOk] = useState(false)
   const [workspace, setWorkspace] = useState('')
+  const [workspaces, setWorkspaces] = useState<Array<{id:string;name:string;path:string;updatedAt:string}>>([])
   const [settings, setSettings] = useState<SettingsData | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [memoryOpen, setMemoryOpen] = useState(false)
@@ -38,8 +39,8 @@ function App() {
 
   async function refresh() {
     try {
-      const [health, chats, saved, cfg] = await Promise.all([
-        api('/api/health'), api('/api/conversations'), api('/api/memories'), api('/api/settings'),
+      const [health, chats, saved, cfg, savedWorkspaces] = await Promise.all([
+        api('/api/health'), api('/api/conversations'), api('/api/memories'), api('/api/settings'), api('/api/workspaces'),
       ])
       setOllamaOk(health.ollama.ok)
       setStatus(health.ollama.ok ? 'Local model connected' : 'Ollama is not responding')
@@ -47,6 +48,7 @@ function App() {
       setMemories(saved)
       setSettings(cfg)
       setWorkspace(cfg.workspace)
+      setWorkspaces(savedWorkspaces)
       if (!activeId && chats.length) { setActiveId(chats[0].id); setMessages(chats[0].messages) }
       else if (activeId) { const current = chats.find((c: Conversation) => c.id === activeId); if (current) setMessages(current.messages) }
     } catch (e) { setStatus(e instanceof Error ? e.message : 'Local server unavailable') }
@@ -66,6 +68,14 @@ function App() {
   async function send() {
     const text = prompt.trim()
     if (!text || busy) return
+    const command = text.match(/^\/(\w+)(?:\s+(.*))?$/)
+    if (command) {
+      const name = command[1].toLowerCase()
+      if (name === 'help' || name === 'commands') { setNotice('Local commands: /help, /status, /workspace, /sync. Aider’s full interactive slash-command set is not available because each request runs as a one-shot Aider process.'); setPrompt(''); return }
+      if (name === 'status') { setNotice(`Model: ${ollamaOk ? 'online' : 'offline'} · Workspace: ${workspace} · Chats: ${conversations.length} · Saved workspaces: ${workspaces.length}`); setPrompt(''); return }
+      if (name === 'workspace') { setSettingsOpen(true); setPrompt(''); return }
+      if (name === 'sync') { setPrompt(''); if (active) void toggleSync(active); else setNotice('Open a conversation before using /sync.'); return }
+    }
     let id = activeId
     if (!id) { try { const c = await api('/api/conversations', { method: 'POST', body: JSON.stringify({ title: text.slice(0, 48) }) }); id = c.id; setActiveId(id); setConversations(prev => [c, ...prev]) } catch (e) { setNotice(String(e)); return } }
     const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, createdAt: new Date().toISOString() }
@@ -149,6 +159,24 @@ function App() {
       }
     } catch (e) { setNotice('Memory sync failed: ' + (e instanceof Error ? e.message : String(e))) }
   }
+  async function saveWorkspace() {
+    try {
+      const item = await api('/api/workspaces', { method: 'POST', body: JSON.stringify({ path: workspace }) })
+      setWorkspaces(prev => prev.some(w => w.id === item.id) ? prev : [...prev, item])
+      const cfg = await api('/api/settings', { method: 'PATCH', body: JSON.stringify({ workspace }) })
+      setSettings(s => s ? { ...s, workspace: cfg.workspace } : s)
+      setNotice('Workspace saved. Its folder remains on this PC; conversations are stored separately.')
+    } catch (e) { setNotice(String(e)) }
+  }
+  async function selectWorkspace(pathValue: string) {
+    setWorkspace(pathValue)
+    try {
+      const cfg = await api('/api/settings', { method: 'PATCH', body: JSON.stringify({ workspace: pathValue }) })
+      setSettings(s => s ? { ...s, workspace: cfg.workspace } : s)
+      setWorkspace(cfg.workspace)
+      setNotice('Active workspace changed. Existing conversations were kept.')
+    } catch (e) { setNotice(String(e)) }
+  }
   async function saveSettings() {
     try {
       const cfg = await api('/api/settings', { method: 'PATCH', body: JSON.stringify({ workspace, cloudUrl: settings?.cloudUrl || '', cloudSyncEnabled: settings?.cloudSyncEnabled || false, cloudLoginEmail: settings?.cloudLoginEmail || '', cloudSyncToken: settings?.cloudSyncToken || '' }) })
@@ -214,11 +242,11 @@ function App() {
           </div>
         </div> : <div className="message-list">{messages.map(m => <article className={'message ' + m.role} key={m.id}><div className="message-avatar">{m.role === 'user' ? 'U' : <Code2 size={16}/>}</div><div className="message-body"><div className="message-meta"><strong>{m.role === 'user' ? 'You' : 'Aider'}</strong><time>{fmtTime(m.createdAt)}</time>{m.error && <span className="error-chip">error</span>}<button className="copy-message" title="Copy message" onClick={() => void navigator.clipboard.writeText(m.content)}><Copy size={13}/></button></div><div className="markdown"><ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown></div></div></article>)}{busy && <article className="message assistant"><div className="message-avatar"><Code2 size={16}/></div><div className="message-body"><div className="message-meta"><strong>Aider</strong><span className="thinking"><i/> Working locally</span></div><div className="markdown">{streamText ? <pre className="stream-output">{streamText.slice(-10000)}</pre> : <div className="thinking-line"><span/><span/><span/> Inspecting your request…</div>}</div></div></article>}<div ref={bottomRef}/></div>}
       </section>
-      <footer className="composer-wrap"><div className="composer"><textarea value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send() } }} placeholder="Ask Aider anything… (Shift + Enter for a new line)" rows={Math.min(5, Math.max(1, prompt.split('\n').length))} disabled={busy}/><div className="composer-footer"><div className="composer-hints"><span><kbd>/</kbd> commands soon</span><span className="hint-separator">·</span><span><Folder size={12}/> project files</span></div><button className="send-button" onClick={() => void send()} disabled={busy || !prompt.trim()} aria-label="Send message">{busy ? <span className="spinner"/> : <ArrowUp size={19}/>}</button></div></div><div className="composer-disclaimer"><ShieldCheck size={12}/> Local inference · No cloud AI API · Review file changes before keeping them</div></footer>
+      <footer className="composer-wrap"><div className="composer"><textarea value={prompt} onChange={e => setPrompt(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send() } }} placeholder="Ask Aider anything… (Shift + Enter for a new line)" rows={Math.min(5, Math.max(1, prompt.split('\n').length))} disabled={busy}/><div className="composer-footer"><div className="composer-hints"><span><kbd>/help</kbd> commands</span><span className="hint-separator">·</span><span><Folder size={12}/> project files</span></div><button className="send-button" onClick={() => void send()} disabled={busy || !prompt.trim()} aria-label="Send message">{busy ? <span className="spinner"/> : <ArrowUp size={19}/>}</button></div></div><div className="composer-disclaimer"><ShieldCheck size={12}/> Local inference · No cloud AI API · Review file changes before keeping them</div></footer>
       {notice && <button className="notice" onClick={() => setNotice('')}><span>{notice}</span><X size={14}/></button>}
       <div className="bottom-status"><span><span className={'status-dot ' + (ollamaOk ? 'online' : '')}/>{status}</span><span><Activity size={13}/> Aider session manager</span><span><Cloud size={13}/> {settings?.cloudSyncEnabled ? 'Selective sync on' : 'Cloud sync off'}</span></div>
     </main>
-    {settingsOpen && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setSettingsOpen(false) }}><section className="settings-modal"><div className="modal-head"><div><div className="eyebrow">PREFERENCES</div><h2>Settings</h2></div><button className="icon-button" onClick={() => setSettingsOpen(false)}><X size={18}/></button></div><div className="settings-section"><h3><FolderOpen size={16}/> Local workspace</h3><label>Project folder path<input value={workspace} onChange={e => setWorkspace(e.target.value)} placeholder="C:\Projects\my-app"/></label><p className="field-help">Aider can read and modify files inside this selected folder. Choose a trusted project directory.</p><div className="readonly-setting"><span>Model</span><strong>{settings?.model || 'huihui_ai/qwen3-abliterated:8b'}</strong></div><div className="readonly-setting"><span>Ollama endpoint</span><strong>{settings?.ollamaBase || 'http://127.0.0.1:11434'}</strong></div></div><div className="settings-section"><h3><Cloud size={16}/> Cloudflare sync</h3><label>Worker URL<input value={settings?.cloudUrl || ''} onChange={e => setSettings(s => s ? {...s, cloudUrl:e.target.value} : s)} placeholder="https://sync.example.com"/></label><label>Cloud sync token<input type="password" autoComplete="off" value={settings?.cloudSyncToken || ''} onChange={e => setSettings(s => s ? {...s, cloudSyncToken:e.target.value} : s)} placeholder="Paste the token configured on the Worker"/></label><div className="sync-row"><div><strong>Allow selective cloud sync</strong><p>Only conversations you explicitly sync are uploaded. Source files and model weights stay local.</p></div><button className={'toggle ' + (settings?.cloudSyncEnabled ? 'on' : '')} onClick={() => setSettings(s => s ? {...s, cloudSyncEnabled:!s.cloudSyncEnabled} : s)} aria-label="Toggle cloud sync"><span/></button></div><button className="secondary-button full" onClick={loginCloud}><Cloud size={15}/> Verify sync token</button><p className="field-help">Uses a private bearer token instead of Zero Trust. Set the same high-entropy token as the Worker secret and here. Anyone with the token can access your synced data.</p></div><div className="modal-actions"><button className="secondary-button" onClick={() => setSettingsOpen(false)}>Cancel</button><button className="primary-button" onClick={() => void saveSettings()}><Check size={15}/> Save settings</button></div></section></div>}
+    {settingsOpen && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setSettingsOpen(false) }}><section className="settings-modal"><div className="modal-head"><div><div className="eyebrow">PREFERENCES</div><h2>Settings</h2></div><button className="icon-button" onClick={() => setSettingsOpen(false)}><X size={18}/></button></div><div className="settings-section"><h3><FolderOpen size={16}/> Local workspace</h3><label>Project folder path<input value={workspace} onChange={e => setWorkspace(e.target.value)} placeholder="C:\Projects\my-app"/></label><p className="field-help">Aider can read and modify files inside this selected folder. Choose a trusted project directory. Workspaces are saved separately from conversations.</p><label>Saved workspaces<select value={workspaces.some(w => w.path === workspace) ? workspace : ''} onChange={e => { if (e.target.value) void selectWorkspace(e.target.value) }}><option value="">Current path (not saved yet)</option>{workspaces.map(w => <option key={w.id} value={w.path}>{w.name} · {w.path}</option>)}</select></label><button className="secondary-button full" onClick={() => void saveWorkspace()}><FolderOpen size={15}/> Save current workspace</button><div className="readonly-setting"><span>Model</span><strong>{settings?.model || 'huihui_ai/qwen3-abliterated:8b'}</strong></div><div className="readonly-setting"><span>Ollama endpoint</span><strong>{settings?.ollamaBase || 'http://127.0.0.1:11434'}</strong></div></div><div className="settings-section"><h3><Cloud size={16}/> Cloudflare sync</h3><label>Worker URL<input value={settings?.cloudUrl || ''} onChange={e => setSettings(s => s ? {...s, cloudUrl:e.target.value} : s)} placeholder="https://sync.example.com"/></label><label>Cloud sync token<input type="password" autoComplete="off" value={settings?.cloudSyncToken || ''} onChange={e => setSettings(s => s ? {...s, cloudSyncToken:e.target.value} : s)} placeholder="Paste the token configured on the Worker"/></label><div className="sync-row"><div><strong>Allow selective cloud sync</strong><p>Only conversations you explicitly sync are uploaded. Source files and model weights stay local.</p></div><button className={'toggle ' + (settings?.cloudSyncEnabled ? 'on' : '')} onClick={() => setSettings(s => s ? {...s, cloudSyncEnabled:!s.cloudSyncEnabled} : s)} aria-label="Toggle cloud sync"><span/></button></div><button className="secondary-button full" onClick={loginCloud}><Cloud size={15}/> Verify sync token</button><p className="field-help">Uses a private bearer token instead of Zero Trust. Set the same high-entropy token as the Worker secret and here. Anyone with the token can access your synced data.</p></div><div className="modal-actions"><button className="secondary-button" onClick={() => setSettingsOpen(false)}>Cancel</button><button className="primary-button" onClick={() => void saveSettings()}><Check size={15}/> Save settings</button></div></section></div>}
     {memoryOpen && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setMemoryOpen(false) }}><section className="settings-modal memory-modal"><div className="modal-head"><div><div className="eyebrow">PERSISTENT CONTEXT</div><h2>Saved memory</h2></div><button className="icon-button" onClick={() => setMemoryOpen(false)}><X size={18}/></button></div><p className="field-help">These notes are stored on this PC and can be included in future Aider prompts. Nothing is uploaded automatically.</p><textarea className="memory-input" value={memoryDraft} onChange={e => setMemoryDraft(e.target.value)} placeholder="Remember a project convention, decision, or preference…"/><button className="primary-button full" onClick={() => void addMemory()}><Plus size={15}/> Save memory</button><div className="memory-list">{memories.map(m => <div className="memory-card" key={m.id}><div><span className="memory-category">{m.category}</span><p>{m.content}</p><small>{m.syncEnabled ? 'Cloud synced' : 'Local only'}</small></div><button className={'icon-button memory-sync ' + (m.syncEnabled ? 'is-synced' : '')} onClick={() => void toggleMemorySync(m)} aria-label={m.syncEnabled ? 'Remove cloud memory' : 'Sync memory to cloud'} title={m.syncEnabled ? 'Remove cloud copy' : 'Sync this memory'}><Cloud size={14}/></button><button className="icon-button" onClick={() => void deleteMemory(m.id)} aria-label="Delete memory"><Trash2 size={15}/></button></div>)}{!memories.length && <div className="empty-memory"><Archive size={22}/><p>No saved memories yet.</p></div>}</div></section></div>}
   </div>
 }
